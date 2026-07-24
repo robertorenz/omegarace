@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Omega Race Clone - Multi Level</title>
+  <style>
+    /* Basic styles: black background and centered canvas */
+    body {
+      margin: 0;
+      background: #000;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <!-- The game will render inside this canvas -->
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  
+  <script>
+    // Get canvas and context
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    // The player's ship
+    const ship = {
+      x: width / 2,
+      y: height / 2,
+      angle: 0,            // in radians
+      acceleration: 0.1,
+      maxSpeed: 5,
+      vx: 0,
+      vy: 0,
+      radius: 10,
+      rotationSpeed: 0.08
+    };
+    
+    // Arrays for bullets and enemies, and a level variable
+    let bullets = [];
+    let enemies = [];
+    let level = 1;
+    
+    // Object to keep track of which keys are held down
+    const keys = {};
+    
+    // Listen for keydown and keyup events
+    document.addEventListener("keydown", (e) => {
+      keys[e.code] = true;
+    });
+    
+    document.addEventListener("keyup", (e) => {
+      keys[e.code] = false;
+    });
+    
+    // Bullet firing control (simple cooldown)
+    let canFire = true;
+    function fireBullet() {
+      const bulletSpeed = 7;
+      bullets.push({
+        x: ship.x + Math.cos(ship.angle) * 20,
+        y: ship.y + Math.sin(ship.angle) * 20,
+        vx: Math.cos(ship.angle) * bulletSpeed + ship.vx,
+        vy: Math.sin(ship.angle) * bulletSpeed + ship.vy,
+        radius: 3
+      });
+    }
+    
+    // Spawn a single enemy at a random location with a random velocity
+    function spawnEnemy() {
+      enemies.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+        radius: 15
+      });
+    }
+    
+    // Spawn enemies for the current level.
+    // For example, level 1 spawns 5 enemies, level 2 spawns 10, etc.
+    function spawnEnemiesForLevel(lvl) {
+      const enemyCount = 5 * lvl;
+      for (let i = 0; i < enemyCount; i++) {
+        spawnEnemy();
+      }
+    }
+    
+    // Reset the game state (e.g., after a collision)
+    function resetGame() {
+      // Reset ship to center with no velocity
+      ship.x = width / 2;
+      ship.y = height / 2;
+      ship.vx = 0;
+      ship.vy = 0;
+      ship.angle = 0;
+      // Clear bullets and enemies, reset level, then spawn enemies for level 1
+      bullets = [];
+      enemies = [];
+      level = 1;
+      spawnEnemiesForLevel(level);
+    }
+    
+    // Update game objects
+    function update() {
+      // --- Update Ship ---
+      // Rotate ship left/right
+      if (keys["ArrowLeft"]) {
+        ship.angle -= ship.rotationSpeed;
+      }
+      if (keys["ArrowRight"]) {
+        ship.angle += ship.rotationSpeed;
+      }
+      // Accelerate forward
+      if (keys["ArrowUp"]) {
+        ship.vx += Math.cos(ship.angle) * ship.acceleration;
+        ship.vy += Math.sin(ship.angle) * ship.acceleration;
+        // Limit the speed
+        const speed = Math.hypot(ship.vx, ship.vy);
+        if (speed > ship.maxSpeed) {
+          ship.vx = (ship.vx / speed) * ship.maxSpeed;
+          ship.vy = (ship.vy / speed) * ship.maxSpeed;
+        }
+      }
+      
+      // Update ship position and wrap around screen edges
+      ship.x += ship.vx;
+      ship.y += ship.vy;
+      if (ship.x < 0) ship.x += width;
+      if (ship.x > width) ship.x -= width;
+      if (ship.y < 0) ship.y += height;
+      if (ship.y > height) ship.y -= height;
+      
+      // --- Fire Bullets ---
+      // Press Space to fire a bullet (with a simple cooldown)
+      if (keys["Space"] && canFire) {
+        fireBullet();
+        canFire = false;
+      }
+      if (!keys["Space"]) {
+        canFire = true;
+      }
+      
+      // --- Update Bullets ---
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        b.x += b.vx;
+        b.y += b.vy;
+        // Remove bullets that go off-screen
+        if (b.x < 0 || b.x > width || b.y < 0 || b.y > height) {
+          bullets.splice(i, 1);
+        }
+      }
+      
+      // --- Update Enemies ---
+      enemies.forEach(enemy => {
+        enemy.x += enemy.vx;
+        enemy.y += enemy.vy;
+        // Bounce enemies off the screen edges
+        if (enemy.x < 0 || enemy.x > width) {
+          enemy.vx = -enemy.vx;
+        }
+        if (enemy.y < 0 || enemy.y > height) {
+          enemy.vy = -enemy.vy;
+        }
+      });
+      
+      // --- Collision Detection ---
+      // Check bullet/enemy collisions
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          let e = enemies[j];
+          const dx = b.x - e.x;
+          const dy = b.y - e.y;
+          if (Math.hypot(dx, dy) < e.radius) {
+            // Remove both bullet and enemy on collision
+            bullets.splice(i, 1);
+            enemies.splice(j, 1);
+            break;
+          }
+        }
+      }
+      
+      // Check enemy/ship collisions (simple game over/reset)
+      for (let enemy of enemies) {
+        const dx = ship.x - enemy.x;
+        const dy = ship.y - enemy.y;
+        if (Math.hypot(dx, dy) < ship.radius + enemy.radius) {
+          resetGame();
+          break;
+        }
+      }
+      
+      // --- Level Progression ---
+      // If all enemies have been cleared, advance to the next level.
+      if (enemies.length === 0) {
+        level++;
+        spawnEnemiesForLevel(level);
+      }
+    }
+    
+    // Draw the ship as a simple triangle
+    function drawShip() {
+      ctx.save();
+      ctx.translate(ship.x, ship.y);
+      ctx.rotate(ship.angle);
+      ctx.beginPath();
+      ctx.moveTo(15, 0);
+      ctx.lineTo(-10, 8);
+      ctx.lineTo(-10, -8);
+      ctx.closePath();
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+    
+    // Draw bullets as small circles
+    function drawBullets() {
+      ctx.fillStyle = "yellow";
+      bullets.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+    
+    // Draw enemies as circles
+    function drawEnemies() {
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 2;
+      enemies.forEach(e => {
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+    }
+    
+    // Render everything to the canvas
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+      drawShip();
+      drawBullets();
+      drawEnemies();
+      
+      // Display the current level in the top-left corner
+      ctx.fillStyle = "white";
+      ctx.font = "20px Arial";
+      ctx.fillText("Level: " + level, 10, 30);
+    }
+    
+    // The main game loop
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+    
+    // Start the game by resetting and spawning level 1 enemies
+    resetGame();
+    gameLoop();
+  </script>
+</body>
+</html>
