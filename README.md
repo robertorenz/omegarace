@@ -4,7 +4,9 @@ A modern, full-browser remake of the classic 1981 vector-arcade game **Omega Rac
 
 ## Play
 
-Open `index.html` in any modern browser (or serve the folder with any static server). The game fills the entire window and adapts to resizing.
+**▶ Play it in your browser: [robertorenz.github.io/omegarace](https://robertorenz.github.io/omegarace/)**
+
+Or open `index.html` locally in any modern browser (or serve the folder with any static server). The game fills the entire window and adapts to resizing.
 
 ## Controls
 
