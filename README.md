@@ -1,9 +1,10 @@
 # Omega Race
 
-A full-browser remake of the classic 1981 vector-arcade game **Omega Race** — in two flavors, selectable from a start page:
+A full-browser remake of the classic 1981 vector-arcade game **Omega Race** — in three flavors, selectable from a start page:
 
 - **Classic Vector** (`classic.html`) — the original look: pure glowing 2D vector lines, exactly the way the cabinet felt. Zero dependencies.
 - **Modern 3D** (`modern.html`) — the same arena rebuilt with Three.js: neon bloom, 3D wireframe ships and droids, spinning mines, particle explosions and a tilted battle camera.
+- **Poly 2.5D** (`poly.html`) — flat-shaded filled polygons projected over the arena floor: banking ships, tumbling gem droids, drop shadows — and over-the-top explosions with polygon shards, shockwave rings, light pillars, screen flash, hit-stop and slow-mo. Zero dependencies.
 
 ## Play
 
@@ -46,6 +47,7 @@ Extra ship every 40,000 points. High scores persist in `localStorage` (tracked s
 - `index.html` — start page with animated mode previews (vanilla canvas).
 - `classic.html` — single-file HTML5 canvas game, vanilla JavaScript, vector-glow rendering with device-pixel-ratio aware scaling.
 - `modern.html` — Three.js (ES modules via CDN import map) with UnrealBloom post-processing, wireframe polyhedra enemies, additive-blended particle bursts and a gently ship-following perspective camera.
+- `poly.html` — a hand-rolled 2.5D polygon renderer on canvas 2D: oblique projection, per-face flat shading with backface culling and painter's sort, extruded walls, and a physics-driven debris system (gravity, floor bounces, tumbling shards).
 - WebAudio-synthesized sound effects in both modes (no audio assets).
 - Modal overlays for start / pause / game-over — no browser alerts.
 

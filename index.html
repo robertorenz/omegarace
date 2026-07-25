@@ -53,17 +53,17 @@
   }
   .cards {
     display: flex;
-    gap: 32px;
+    gap: 28px;
     flex-wrap: wrap;
     justify-content: center;
-    max-width: 1100px;
+    max-width: 1400px;
     width: 100%;
   }
   .card {
     background: linear-gradient(180deg, var(--panel) 0%, #070d16 100%);
     border: 1px solid rgba(53, 224, 255, 0.22);
     border-radius: 12px;
-    width: min(480px, 100%);
+    width: min(420px, 100%);
     overflow: hidden;
     text-decoration: none;
     color: inherit;
@@ -80,9 +80,13 @@
     border-color: rgba(255, 179, 71, 0.6);
     box-shadow: 0 0 44px rgba(255, 179, 71, 0.14), 0 28px 60px rgba(0,0,0,0.55);
   }
+  .card.poly:hover {
+    border-color: rgba(255, 93, 93, 0.6);
+    box-shadow: 0 0 44px rgba(255, 93, 93, 0.14), 0 28px 60px rgba(0,0,0,0.55);
+  }
   .preview {
     width: 100%;
-    height: 220px;
+    height: 200px;
     display: block;
     background: #030509;
     border-bottom: 1px solid rgba(53, 224, 255, 0.15);
@@ -96,6 +100,7 @@
   }
   .card.classic h2 span { color: var(--accent); text-shadow: 0 0 14px rgba(53,224,255,0.5); }
   .card.modern h2 span { color: var(--warn); text-shadow: 0 0 14px rgba(255,179,71,0.5); }
+  .card.poly h2 span { color: var(--danger); text-shadow: 0 0 14px rgba(255,93,93,0.5); }
   .card p {
     margin: 14px 0 24px;
     color: var(--dim);
@@ -118,6 +123,8 @@
   .card.modern .play { border-color: var(--warn); color: var(--warn); }
   .card:hover .play { background: rgba(53, 224, 255, 0.12); box-shadow: 0 0 20px rgba(53,224,255,0.25); }
   .card.modern:hover .play { background: rgba(255, 179, 71, 0.12); box-shadow: 0 0 20px rgba(255,179,71,0.25); }
+  .card.poly .play { border-color: var(--danger); color: var(--danger); }
+  .card.poly:hover .play { background: rgba(255, 93, 93, 0.12); box-shadow: 0 0 20px rgba(255,93,93,0.25); }
   footer {
     margin-top: 48px;
     text-align: center;
@@ -159,6 +166,16 @@
       <span class="play">PLAY MODERN</span>
     </div>
   </a>
+
+  <a class="card poly" href="poly.html">
+    <canvas class="preview" id="previewPoly"></canvas>
+    <div class="card-body">
+      <h2>POLY <span>2.5D</span></h2>
+      <p>Flat-shaded filled polygons over the arena floor — banking ships,
+         tumbling gem droids and absurd explosions: shards, shockwaves and slow-mo.</p>
+      <span class="play">PLAY POLY</span>
+    </div>
+  </a>
 </main>
 
 <footer>
@@ -173,9 +190,11 @@
 (function () {
   const hc = parseInt(localStorage.getItem("omegaRaceHigh") || "0", 10);
   const hm = parseInt(localStorage.getItem("omegaRaceHighModern") || "0", 10);
+  const hp = parseInt(localStorage.getItem("omegaRaceHighPoly") || "0", 10);
   const parts = [];
   if (hc > 0) parts.push("CLASSIC BEST " + hc.toLocaleString());
   if (hm > 0) parts.push("MODERN BEST " + hm.toLocaleString());
+  if (hp > 0) parts.push("POLY BEST " + hp.toLocaleString());
   document.getElementById("highLine").textContent = parts.join("   ✦   ");
 })();
 
@@ -290,6 +309,79 @@ function setupCanvas(id) {
     wire(oct, octEdges, t * 0.8, t * 1.1, 34, w * 0.72, h * 0.42, "#ffb347");
     // ship
     wire(shipV, shipE, 0.45, t * 0.7, 30, w * 0.3, h * 0.55, "#dbe7f0");
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+// ---- Poly preview: flat-shaded filled octahedron with pulse rings
+(function () {
+  const { c, ctx, dpr } = setupCanvas("previewPoly");
+  const LIGHT = (v => { const l = Math.hypot(...v); return v.map(x => x / l); })([-0.5, -0.6, 0.7]);
+  function rotXYZ(v, rx, ry) {
+    let [x, y, z] = v;
+    let x1 = x * Math.cos(ry) + z * Math.sin(ry);
+    let z1 = -x * Math.sin(ry) + z * Math.cos(ry);
+    let y1 = y * Math.cos(rx) - z1 * Math.sin(rx);
+    let z2 = y * Math.sin(rx) + z1 * Math.cos(rx);
+    return [x1, y1, z2];
+  }
+  function drawSolid(rx, ry, s, cx, cy, rgb) {
+    const faces = [];
+    for (const sx of [1,-1]) for (const sy of [1,-1]) for (const sz of [1,-1])
+      faces.push([[sx,0,0],[0,sy,0],[0,0,sz]]);
+    const out = [];
+    for (const f of faces) {
+      const tv = f.map(v => rotXYZ(v, rx, ry));
+      const e1 = tv[1].map((v,i) => v - tv[0][i]);
+      const e2 = tv[2].map((v,i) => v - tv[0][i]);
+      let n = [e1[1]*e2[2]-e1[2]*e2[1], e1[2]*e2[0]-e1[0]*e2[2], e1[0]*e2[1]-e1[1]*e2[0]];
+      const nl = Math.hypot(...n) || 1;
+      n = n.map(v => v / nl);
+      const ctr = [0,1,2].map(i => (tv[0][i]+tv[1][i]+tv[2][i]) / 3);
+      if (n[0]*ctr[0] + n[1]*ctr[1] + n[2]*ctr[2] < 0) n = n.map(v => -v);
+      if (n[2] <= 0) continue;
+      const k = 0.4 + 0.6 * Math.max(0, n[0]*LIGHT[0] + n[1]*LIGHT[1] + n[2]*LIGHT[2]);
+      out.push({
+        z: ctr[2],
+        pts: tv.map(p => [cx + p[0]*s, cy - p[1]*s]),
+        fill: `rgb(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)})`,
+      });
+    }
+    out.sort((a, b) => a.z - b.z);
+    for (const f of out) {
+      ctx.beginPath();
+      ctx.moveTo(f.pts[0][0], f.pts[0][1]);
+      ctx.lineTo(f.pts[1][0], f.pts[1][1]);
+      ctx.lineTo(f.pts[2][0], f.pts[2][1]);
+      ctx.closePath();
+      ctx.fillStyle = f.fill;
+      ctx.fill();
+      ctx.strokeStyle = f.fill;
+      ctx.stroke();
+    }
+  }
+  function frame(now) {
+    const t = now / 1000;
+    const w = c.width / dpr, h = c.height / dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    // pulse rings
+    const cycle = (t % 2.2) / 2.2;
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(255, 93, 93, ${0.55 * (1 - cycle)})`;
+    ctx.lineWidth = 4 * (1 - cycle) + 1;
+    ctx.beginPath();
+    ctx.arc(w * 0.28, h * 0.6, 12 + cycle * 70, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+    // shadow + solids
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(w * 0.66, h * 0.52 + 46, 34, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    drawSolid(t * 0.9, t * 1.3, 42, w * 0.66, h * 0.48, [255, 179, 71]);
+    drawSolid(-t * 0.7, t * 1.1, 20, w * 0.28, h * 0.6, [255, 93, 93]);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

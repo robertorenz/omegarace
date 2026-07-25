@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omega Race — Poly 2.5D</title>
+<style>
+  :root {
+    --bg: #05080d;
+    --ink: #dbe7f0;
+    --dim: #6b7d8c;
+    --accent: #35e0ff;
+    --warn: #ffb347;
+    --danger: #ff5d5d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+    color: var(--ink);
+  }
+  #game { display: block; width: 100vw; height: 100vh; background: var(--bg); }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 6, 10, 0.72);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .modal-backdrop.show { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: linear-gradient(180deg, #0b1420 0%, #070d16 100%);
+    border: 1px solid rgba(255, 93, 93, 0.35);
+    box-shadow: 0 0 40px rgba(255, 93, 93, 0.10), 0 24px 60px rgba(0,0,0,0.6);
+    border-radius: 10px;
+    padding: 40px 52px;
+    text-align: center;
+    max-width: 560px;
+    width: calc(100vw - 48px);
+  }
+  .modal h1 {
+    font-size: 38px;
+    letter-spacing: 9px;
+    color: var(--danger);
+    text-shadow: 0 0 18px rgba(255, 93, 93, 0.55);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .modal h1 small { display: block; font-size: 14px; letter-spacing: 6px; color: var(--accent); margin-top: 8px; }
+  .modal h2 {
+    font-size: 26px;
+    letter-spacing: 6px;
+    color: var(--danger);
+    text-shadow: 0 0 14px rgba(255, 93, 93, 0.5);
+    margin-bottom: 14px;
+  }
+  .modal .tagline { color: var(--dim); letter-spacing: 3px; font-size: 13px; margin-bottom: 26px; }
+  .controls {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 8px 18px;
+    justify-content: center;
+    margin: 0 auto 28px;
+    font-size: 14px;
+    text-align: left;
+  }
+  .controls .key { color: var(--warn); text-align: right; white-space: nowrap; }
+  .controls .desc { color: var(--ink); }
+  .stat-row { display: flex; justify-content: center; gap: 40px; margin-bottom: 26px; }
+  .stat-row .stat b {
+    display: block;
+    font-size: 28px;
+    color: var(--ink);
+    text-shadow: 0 0 10px rgba(219, 231, 240, 0.35);
+  }
+  .stat-row .stat span { font-size: 11px; letter-spacing: 3px; color: var(--dim); }
+  .btn {
+    display: inline-block;
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    font-family: inherit;
+    font-size: 15px;
+    letter-spacing: 4px;
+    padding: 12px 34px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-shadow: 0 0 10px rgba(255, 93, 93, 0.4);
+    text-decoration: none;
+  }
+  .btn:hover { background: rgba(255, 93, 93, 0.12); box-shadow: 0 0 24px rgba(255, 93, 93, 0.25); }
+  .btn.secondary { border-color: var(--dim); color: var(--dim); text-shadow: none; }
+  .btn.secondary:hover { border-color: var(--ink); color: var(--ink); background: rgba(219,231,240,0.06); box-shadow: none; }
+  .btn-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .hint { margin-top: 16px; font-size: 12px; color: var(--dim); letter-spacing: 2px; }
+  .newhigh {
+    color: var(--warn);
+    letter-spacing: 4px;
+    font-size: 14px;
+    margin-bottom: 14px;
+    text-shadow: 0 0 12px rgba(255, 179, 71, 0.5);
+    display: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- Start modal -->
+<div class="modal-backdrop show" id="startModal">
+  <div class="modal">
+    <h1>OMEGA RACE<small>POLY 2.5D</small></h1>
+    <p class="tagline">FILLED POLYGONS &mdash; MAXIMUM DESTRUCTION</p>
+    <div class="controls">
+      <span class="key">&larr; / A &nbsp; &rarr; / D</span><span class="desc">Rotate ship</span>
+      <span class="key">&uarr; / W</span><span class="desc">Thrust</span>
+      <span class="key">SPACE</span><span class="desc">Fire</span>
+      <span class="key">P</span><span class="desc">Pause</span>
+      <span class="key">M</span><span class="desc">Mute sound</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="startBtn">START MISSION</button>
+      <a class="btn secondary" href="index.html">MENU</a>
+    </div>
+    <p class="hint">SHIP BOUNCES OFF THE WALLS &mdash; USE IT</p>
+  </div>
+</div>
+
+<!-- Game over modal -->
+<div class="modal-backdrop" id="overModal">
+  <div class="modal">
+    <h2>GAME OVER</h2>
+    <p class="newhigh" id="newHigh">&#9733; NEW HIGH SCORE &#9733;</p>
+    <div class="stat-row">
+      <div class="stat"><b id="finalScore">0</b><span>SCORE</span></div>
+      <div class="stat"><b id="finalWave">1</b><span>WAVE</span></div>
+      <div class="stat"><b id="finalHigh">0</b><span>BEST</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="restartBtn">PLAY AGAIN</button>
+      <a class="btn secondary" href="index.html">MENU</a>
+    </div>
+    <p class="hint">OR PRESS ENTER</p>
+  </div>
+</div>
+
+<!-- Pause modal -->
+<div class="modal-backdrop" id="pauseModal">
+  <div class="modal">
+    <h1 style="font-size:30px;">PAUSED</h1>
+    <p class="tagline">SYSTEMS ON STANDBY</p>
+    <div class="btn-row">
+      <button class="btn" id="resumeBtn">RESUME</button>
+      <a class="btn secondary" href="index.html">MENU</a>
+    </div>
+    <p class="hint">OR PRESS P</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ================================================================ Canvas
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+function resizeCanvas() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  computeField();
+}
+window.addEventListener("resize", resizeCanvas);
+
+const field = { l: 0, t: 0, r: 0, b: 0, box: { l: 0, t: 0, r: 0, b: 0 } };
+function computeField() {
+  const m = Math.max(14, Math.min(W, H) * 0.025);
+  field.l = m; field.t = m; field.r = W - m; field.b = H - m;
+  const fw = field.r - field.l, fh = field.b - field.t;
+  const bw = Math.max(260, fw * 0.42), bh = Math.max(150, fh * 0.30);
+  field.box.l = (W - bw) / 2;
+  field.box.r = (W + bw) / 2;
+  field.box.t = (H - bh) / 2;
+  field.box.b = (H + bh) / 2;
+}
+
+// ================================================================ 3D helpers
+// World: X = screen right, Y = screen down, Z = up out of the floor.
+// Oblique projection: sx = x, sy = y - z * ZS.
+const ZS = 0.55;
+const LIGHT = norm3([-0.45, -0.6, 0.72]);
+const VIEW = norm3([0, -0.5, 1]);
+
+function norm3(v) {
+  const l = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+}
+function dot3(a, b) { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+function cross3(a, b) {
+  return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+}
+function rotX(v, a) { const c=Math.cos(a), s=Math.sin(a); return [v[0], v[1]*c - v[2]*s, v[1]*s + v[2]*c]; }
+function rotY(v, a) { const c=Math.cos(a), s=Math.sin(a); return [v[0]*c + v[2]*s, v[1], -v[0]*s + v[2]*c]; }
+function rotZ(v, a) { const c=Math.cos(a), s=Math.sin(a); return [v[0]*c - v[1]*s, v[0]*s + v[1]*c, v[2]]; }
+
+function shadeCss(rgb, k, alpha) {
+  return `rgba(${Math.round(rgb[0]*k)},${Math.round(rgb[1]*k)},${Math.round(rgb[2]*k)},${alpha ?? 1})`;
+}
+
+// Draw a convex origin-centered model. Faces: {v:[[x,y,z],..], c:[r,g,b]}
+function drawModel(faces, px, py, yaw, pitch, roll, scale, alpha) {
+  const out = [];
+  for (const f of faces) {
+    const tv = [];
+    let cx = 0, cy = 0, cz = 0;
+    for (const v of f.v) {
+      let p = [v[0]*scale, v[1]*scale, v[2]*scale];
+      if (pitch) p = rotX(p, pitch);
+      if (roll) p = rotY(p, roll);
+      p = rotZ(p, yaw);
+      tv.push(p);
+      cx += p[0]; cy += p[1]; cz += p[2];
+    }
+    const n = f.v.length;
+    cx /= n; cy /= n; cz /= n;
+    let nor = norm3(cross3(
+      [tv[1][0]-tv[0][0], tv[1][1]-tv[0][1], tv[1][2]-tv[0][2]],
+      [tv[2][0]-tv[0][0], tv[2][1]-tv[0][1], tv[2][2]-tv[0][2]]
+    ));
+    // orient outward (convex, origin-centered)
+    if (nor[0]*cx + nor[1]*cy + nor[2]*cz < 0) nor = [-nor[0], -nor[1], -nor[2]];
+    if (dot3(nor, VIEW) <= 0.02) continue; // backface
+    const k = 0.42 + 0.58 * Math.max(0, dot3(nor, LIGHT));
+    out.push({
+      depth: dot3([cx, cy, cz], VIEW),
+      pts: tv.map(p => [px + p[0], py + p[1] - p[2]*ZS]),
+      fill: shadeCss(f.c, k, alpha),
+    });
+  }
+  out.sort((a, b) => a.depth - b.depth);
+  for (const f of out) {
+    ctx.beginPath();
+    ctx.moveTo(f.pts[0][0], f.pts[0][1]);
+    for (let i = 1; i < f.pts.length; i++) ctx.lineTo(f.pts[i][0], f.pts[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = f.fill;
+    ctx.fill();
+    ctx.strokeStyle = f.fill;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+// ================================================================ Models
+function octahedron(r, c) {
+  const faces = [];
+  for (const sx of [1, -1]) for (const sy of [1, -1]) for (const sz of [1, -1]) {
+    faces.push({ v: [[sx*r,0,0],[0,sy*r,0],[0,0,sz*r]], c });
+  }
+  return faces;
+}
+function bipyramid(sides, r, h, c, c2) {
+  const faces = [], e = [];
+  for (let i = 0; i < sides; i++) {
+    const a = (Math.PI * 2 / sides) * i;
+    e.push([Math.cos(a)*r, Math.sin(a)*r, 0]);
+  }
+  for (let i = 0; i < sides; i++) {
+    const j = (i + 1) % sides;
+    faces.push({ v: [[0,0,h], e[i], e[j]], c });
+    faces.push({ v: [[0,0,-h], e[i], e[j]], c: c2 || c });
+  }
+  return faces;
+}
+function tetra(r, c) {
+  const v = [[r,r,r],[r,-r,-r],[-r,r,-r],[-r,-r,r]];
+  return [
+    { v: [v[0],v[1],v[2]], c }, { v: [v[0],v[1],v[3]], c },
+    { v: [v[0],v[2],v[3]], c }, { v: [v[1],v[2],v[3]], c },
+  ];
+}
+
+const SHIP_MODEL = (() => {
+  const nose = [15, 0, 1], tl = [-11, 10, 0], tr = [-11, -10, 0],
+        spine = [-8, 0, 6], belly = [-7, 0, -3];
+  const hull = [225, 235, 245], hull2 = [150, 170, 190], glass = [80, 210, 240];
+  return [
+    { v: [nose, tl, spine], c: hull },
+    { v: [nose, tr, spine], c: hull },
+    { v: [tl, tr, spine], c: hull2 },
+    { v: [nose, tl, belly], c: hull2 },
+    { v: [nose, tr, belly], c: hull2 },
+    { v: [tl, tr, belly], c: hull2 },
+    { v: [[9,0,2.2],[2,3.4,3.6],[2,-3.4,3.6]], c: glass },
+  ];
+})();
+const DROID_MODEL = octahedron(12, [255, 179, 71]);
+const CMD_MODEL = bipyramid(6, 14, 13, [255, 93, 93], [200, 60, 70]);
+const MINE_MODEL = tetra(7.5, [255, 215, 94]);
+const PBULLET_MODEL = octahedron(4.5, [230, 240, 250]);
+const EBULLET_MODEL = octahedron(5, [255, 100, 100]);
+
+// ================================================================ Audio
+let audioCtx = null, muted = false;
+function beep(type, f0, f1, dur, vol) {
+  if (muted) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const t = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) { /* audio unavailable */ }
+}
+const sfx = {
+  fire:    () => beep("square",   840, 180, 0.10, 0.05),
+  bounce:  () => beep("triangle", 220,  90, 0.09, 0.09),
+  boom:    () => { beep("sawtooth", 170, 28, 0.4, 0.15); beep("square", 90, 24, 0.5, 0.10); },
+  bigBoom: () => { beep("sawtooth", 120, 18, 0.7, 0.2); beep("square", 60, 16, 0.9, 0.14); beep("triangle", 300, 40, 0.4, 0.08); },
+  mine:    () => beep("square",   500, 100, 0.15, 0.08),
+  wave:    () => beep("triangle", 320, 640, 0.35, 0.08),
+  extra:   () => beep("square",   660, 1320, 0.4, 0.08),
+};
+
+// ================================================================ Input
+const keys = {};
+window.addEventListener("keydown", (e) => {
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+  if (e.code === "KeyM") muted = !muted;
+  if (e.code === "KeyP" && (state === "playing" || state === "paused")) togglePause();
+  if (e.code === "Enter" && (state === "menu" || state === "gameover")) startGame();
+});
+window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+// ================================================================ State
+let state = "menu";
+let score = 0, lives = 3, wave = 1;
+let highScore = parseInt(localStorage.getItem("omegaRaceHighPoly") || "0", 10);
+let nextExtraLife = 40000;
+let respawnTimer = 0, waveTimer = 0, shake = 0;
+let hitStop = 0, timeScale = 1, flashAlpha = 0;
+
+const ship = {
+  x: 0, y: 0, vx: 0, vy: 0, angle: -Math.PI / 2,
+  r: 9, cooldown: 0, invuln: 0, alive: false, thrusting: false, roll: 0,
+};
+let bullets = [], enemyBullets = [], droids = [], mines = [], floaters = [];
+let shards = [], sparks = [], rings = [], pillars = [];
+let trail = [];
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const dist2 = (ax, ay, bx, by) => (ax-bx)*(ax-bx) + (ay-by)*(ay-by);
+
+// ================================================================ Effects
+function spawnSparks(x, y, n, rgb, speed) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = rand(0.25, 1) * speed;
+    sparks.push({
+      x, y, z: rand(2, 12),
+      vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: rand(20, 130),
+      life: rand(0.4, 1.1), maxLife: 1.1, rgb,
+    });
+  }
+}
+function spawnShards(model, x, y, scale, speed) {
+  for (const f of model) {
+    const a = Math.random() * Math.PI * 2;
+    const s = rand(0.4, 1) * speed;
+    shards.push({
+      v: f.v, c: f.c, x, y, z: 6,
+      vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: rand(60, 220),
+      yaw: rand(0, Math.PI*2), pitch: rand(0, Math.PI*2), roll: rand(0, Math.PI*2),
+      sYaw: rand(-7, 7), sPitch: rand(-7, 7), sRoll: rand(-7, 7),
+      scale, life: rand(0.9, 1.5), maxLife: 1.5,
+    });
+  }
+}
+function spawnRings(x, y, n, rgb, big) {
+  for (let i = 0; i < n; i++) {
+    rings.push({ x, y, r: 4, speed: (big ? 480 : 330) - i * 90, width: (big ? 7 : 5) - i, life: 0.55 + i * 0.14, maxLife: 0.55 + i * 0.14, rgb });
+  }
+}
+function spawnPillar(x, y, rgb, big) {
+  pillars.push({ x, y, h: big ? 260 : 150, w: big ? 26 : 14, life: 0.5, maxLife: 0.5, rgb });
+}
+function boomSmall(x, y, rgb) {
+  spawnSparks(x, y, 10, rgb, 160);
+  spawnRings(x, y, 1, rgb, false);
+}
+function boomEnemy(d) {
+  const rgb = d.cmd ? [255, 93, 93] : [255, 179, 71];
+  spawnShards(d.cmd ? CMD_MODEL : DROID_MODEL, d.x, d.y, 1, 190);
+  spawnSparks(d.x, d.y, 26, rgb, 260);
+  spawnSparks(d.x, d.y, 10, [255, 240, 200], 340);
+  spawnRings(d.x, d.y, 2, rgb, false);
+  spawnPillar(d.x, d.y, rgb, false);
+  flashAlpha = Math.min(0.35, flashAlpha + 0.16);
+  shake = Math.max(shake, 9);
+  hitStop = Math.max(hitStop, 0.05);
+}
+function boomShip() {
+  spawnShards(SHIP_MODEL, ship.x, ship.y, 1.15, 240);
+  spawnSparks(ship.x, ship.y, 46, [220, 235, 245], 330);
+  spawnSparks(ship.x, ship.y, 22, [53, 224, 255], 260);
+  spawnRings(ship.x, ship.y, 3, [120, 225, 250], true);
+  spawnPillar(ship.x, ship.y, [180, 235, 250], true);
+  flashAlpha = 0.7;
+  shake = 24;
+  timeScale = 0.32;
+}
+
+// ================================================================ Floaters
+function floatScore(x, y, text, color) {
+  floaters.push({ x, y, text, color, life: 1.1 });
+}
+
+// ================================================================ Path
+function pathRect() {
+  return {
+    l: (field.l + field.box.l) / 2,
+    r: (field.r + field.box.r) / 2,
+    t: (field.t + field.box.t) / 2,
+    b: (field.b + field.box.b) / 2,
+  };
+}
+function pathPoint(t) {
+  const p = pathRect();
+  const w = p.r - p.l, h = p.b - p.t, per = 2 * (w + h);
+  let d = ((t % per) + per) % per;
+  if (d < w) return { x: p.l + d, y: p.t };
+  d -= w;
+  if (d < h) return { x: p.r, y: p.t + d };
+  d -= h;
+  if (d < w) return { x: p.r - d, y: p.b };
+  d -= w;
+  return { x: p.l, y: p.b - d };
+}
+function pathPerimeter() {
+  const p = pathRect();
+  return 2 * ((p.r - p.l) + (p.b - p.t));
+}
+
+// ================================================================ Waves
+function startWave(n) {
+  wave = n;
+  droids = []; mines = []; enemyBullets = [];
+  const count = Math.min(4 + n, 10);
+  const commanders = Math.min(1 + Math.floor(n / 2), 3);
+  const per = pathPerimeter();
+  for (let i = 0; i < count; i++) {
+    const isCmd = i < commanders;
+    droids.push({
+      t: (per / count) * i, x: 0, y: 0,
+      speed: (70 + n * 10 + rand(-10, 10)) * (isCmd ? 1.15 : 1),
+      r: isCmd ? 12 : 10, cmd: isCmd,
+      fireTimer: rand(1.5, 4), mineTimer: rand(3, 7),
+      wobble: rand(0, Math.PI * 2), hunting: false, vx: 0, vy: 0,
+      spin: rand(0.7, 1.5),
+    });
+  }
+  droids.forEach(d => { const p = pathPoint(d.t); d.x = p.x; d.y = p.y; });
+  waveTimer = 2.0;
+  sfx.wave();
+}
+
+function spawnShip() {
+  ship.x = W / 2;
+  ship.y = (field.box.b + field.b) / 2;
+  ship.vx = 0; ship.vy = 0;
+  ship.angle = -Math.PI / 2;
+  ship.invuln = 2.2;
+  ship.alive = true;
+  ship.roll = 0;
+  trail = [];
+}
+
+function startGame() {
+  score = 0; lives = 3; nextExtraLife = 40000;
+  bullets = []; enemyBullets = []; floaters = [];
+  shards = []; sparks = []; rings = []; pillars = [];
+  timeScale = 1; hitStop = 0; flashAlpha = 0;
+  hideModal("startModal"); hideModal("overModal");
+  state = "playing";
+  startWave(1);
+  spawnShip();
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function addScore(pts, x, y, color) {
+  score += pts;
+  if (x !== undefined) floatScore(x, y, "+" + pts, color || "#dbe7f0");
+  if (score >= nextExtraLife) {
+    lives++;
+    nextExtraLife += 40000;
+    floatScore(W / 2, field.box.t - 24, "EXTRA SHIP", "#ffb347");
+    sfx.extra();
+  }
+}
+
+// ================================================================ Modals
+function showModal(id) { document.getElementById(id).classList.add("show"); }
+function hideModal(id) { document.getElementById(id).classList.remove("show"); }
+function togglePause() {
+  if (state === "playing") { state = "paused"; showModal("pauseModal"); }
+  else if (state === "paused") { state = "playing"; hideModal("pauseModal"); last = performance.now(); }
+}
+document.getElementById("startBtn").addEventListener("click", startGame);
+document.getElementById("restartBtn").addEventListener("click", startGame);
+document.getElementById("resumeBtn").addEventListener("click", togglePause);
+
+function gameOver() {
+  state = "gameover";
+  const isHigh = score > highScore;
+  if (isHigh) {
+    highScore = score;
+    localStorage.setItem("omegaRaceHighPoly", String(highScore));
+  }
+  document.getElementById("finalScore").textContent = score.toLocaleString();
+  document.getElementById("finalWave").textContent = wave;
+  document.getElementById("finalHigh").textContent = highScore.toLocaleString();
+  document.getElementById("newHigh").style.display = isHigh ? "block" : "none";
+  setTimeout(() => showModal("overModal"), 1100);
+}
+
+// ================================================================ Physics
+function bounceOffWalls(o, damp) {
+  let hit = false;
+  if (o.x < field.l + o.r) { o.x = field.l + o.r; o.vx = Math.abs(o.vx) * damp; hit = true; }
+  if (o.x > field.r - o.r) { o.x = field.r - o.r; o.vx = -Math.abs(o.vx) * damp; hit = true; }
+  if (o.y < field.t + o.r) { o.y = field.t + o.r; o.vy = Math.abs(o.vy) * damp; hit = true; }
+  if (o.y > field.b - o.r) { o.y = field.b - o.r; o.vy = -Math.abs(o.vy) * damp; hit = true; }
+  return hit;
+}
+function bounceOffBox(o, damp) {
+  const b = field.box, r = o.r;
+  if (o.x > b.l - r && o.x < b.r + r && o.y > b.t - r && o.y < b.b + r) {
+    const dl = o.x - (b.l - r);
+    const dr = (b.r + r) - o.x;
+    const dt = o.y - (b.t - r);
+    const db = (b.b + r) - o.y;
+    const min = Math.min(dl, dr, dt, db);
+    if (min === dl)      { o.x = b.l - r; o.vx = -Math.abs(o.vx) * damp; }
+    else if (min === dr) { o.x = b.r + r; o.vx = Math.abs(o.vx) * damp; }
+    else if (min === dt) { o.y = b.t - r; o.vy = -Math.abs(o.vy) * damp; }
+    else                 { o.y = b.b + r; o.vy = Math.abs(o.vy) * damp; }
+    return true;
+  }
+  return false;
+}
+
+function killShip() {
+  if (!ship.alive || ship.invuln > 0) return;
+  ship.alive = false;
+  lives--;
+  boomShip();
+  sfx.bigBoom();
+  if (lives <= 0) { gameOver(); }
+  else { respawnTimer = 2.2; }
+}
+
+function destroyDroid(i, byPlayer) {
+  const d = droids[i];
+  const pts = d.cmd ? 1500 : 1000;
+  boomEnemy(d);
+  sfx.boom();
+  droids.splice(i, 1);
+  if (byPlayer) addScore(pts, d.x, d.y, d.cmd ? "#ff5d5d" : "#ffb347");
+  droids.forEach(s => { s.speed *= 1.06; });
+  if (droids.length > 0 && droids.length <= 2) droids.forEach(s => { s.hunting = true; });
+}
+
+// ================================================================ Update
+function update(dt) {
+  if (waveTimer > 0) waveTimer -= dt;
+  if (shake > 0) shake = Math.max(0, shake - dt * 34);
+  if (flashAlpha > 0) flashAlpha = Math.max(0, flashAlpha - dt * 2.4);
+
+  // --- Ship
+  if (ship.alive) {
+    const turn = 4.6;
+    let turning = 0;
+    if (keys["ArrowLeft"] || keys["KeyA"]) { ship.angle -= turn * dt; turning = -1; }
+    if (keys["ArrowRight"] || keys["KeyD"]) { ship.angle += turn * dt; turning = 1; }
+    ship.roll += ((turning * 0.6) - ship.roll) * Math.min(1, 8 * dt);
+    ship.thrusting = !!(keys["ArrowUp"] || keys["KeyW"]);
+    if (ship.thrusting) {
+      ship.vx += Math.cos(ship.angle) * 340 * dt;
+      ship.vy += Math.sin(ship.angle) * 340 * dt;
+    }
+    const drag = Math.pow(0.45, dt);
+    ship.vx *= drag; ship.vy *= drag;
+    const sp = Math.hypot(ship.vx, ship.vy), maxSp = 420;
+    if (sp > maxSp) { ship.vx *= maxSp / sp; ship.vy *= maxSp / sp; }
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
+    if (bounceOffWalls(ship, 0.92) | bounceOffBox(ship, 0.92)) {
+      sfx.bounce();
+      spawnSparks(ship.x, ship.y, 6, [53, 224, 255], 130);
+    }
+    trail.unshift({ x: ship.x, y: ship.y });
+    if (trail.length > 16) trail.pop();
+    if (ship.invuln > 0) ship.invuln -= dt;
+    if (ship.cooldown > 0) ship.cooldown -= dt;
+    if (keys["Space"] && ship.cooldown <= 0) {
+      const a = ship.angle;
+      bullets.push({
+        x: ship.x + Math.cos(a) * 14, y: ship.y + Math.sin(a) * 14,
+        vx: Math.cos(a) * 560 + ship.vx * 0.4, vy: Math.sin(a) * 560 + ship.vy * 0.4,
+        r: 3, life: 1.4, bounces: 1, spin: rand(0, Math.PI * 2),
+      });
+      ship.cooldown = 0.18;
+      sfx.fire();
+    }
+  } else if (state === "playing" && lives > 0) {
+    respawnTimer -= dt;
+    if (respawnTimer <= 0) spawnShip();
+  }
+
+  // --- Player bullets
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt; b.spin += dt * 12;
+    if (bounceOffWalls(b, 1) | bounceOffBox(b, 1)) {
+      spawnSparks(b.x, b.y, 3, [230, 240, 250], 90);
+      if (--b.bounces < 0) { bullets.splice(i, 1); continue; }
+    }
+    if (b.life <= 0) { bullets.splice(i, 1); continue; }
+  }
+
+  // --- Enemy bullets
+  for (let i = enemyBullets.length - 1; i >= 0; i--) {
+    const b = enemyBullets[i];
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt; b.spin += dt * 10;
+    const wall = b.x < field.l || b.x > field.r || b.y < field.t || b.y > field.b;
+    const inBox = b.x > field.box.l && b.x < field.box.r && b.y > field.box.t && b.y < field.box.b;
+    if (b.life <= 0 || wall || inBox) { enemyBullets.splice(i, 1); continue; }
+    if (ship.alive && ship.invuln <= 0 && dist2(b.x, b.y, ship.x, ship.y) < (ship.r + b.r) ** 2) {
+      enemyBullets.splice(i, 1);
+      killShip();
+    }
+  }
+
+  // --- Droids
+  const per = pathPerimeter();
+  for (const d of droids) {
+    d.wobble += dt * 3;
+    if (d.hunting && ship.alive) {
+      const a = Math.atan2(ship.y - d.y, ship.x - d.x);
+      const sp = d.speed * 1.05;
+      d.vx += (Math.cos(a) * sp - d.vx) * 1.4 * dt;
+      d.vy += (Math.sin(a) * sp - d.vy) * 1.4 * dt;
+      d.x += d.vx * dt; d.y += d.vy * dt;
+      bounceOffWalls(d, 1); bounceOffBox(d, 1);
+    } else {
+      d.t = (d.t + d.speed * dt) % per;
+      const p = pathPoint(d.t);
+      const wob = Math.sin(d.wobble) * 10;
+      const cx = W / 2, cy = H / 2;
+      const ca = Math.atan2(p.y - cy, p.x - cx);
+      const tx = p.x + Math.cos(ca) * wob;
+      const ty = p.y + Math.sin(ca) * wob;
+      d.x += (tx - d.x) * Math.min(1, 6 * dt);
+      d.y += (ty - d.y) * Math.min(1, 6 * dt);
+    }
+    if (d.cmd && ship.alive && state === "playing") {
+      d.fireTimer -= dt;
+      if (d.fireTimer <= 0) {
+        d.fireTimer = rand(1.6, 3.2) * Math.max(0.55, 1 - wave * 0.05);
+        const a = Math.atan2(ship.y - d.y, ship.x - d.x) + rand(-0.12, 0.12);
+        const sp = 230 + wave * 12;
+        enemyBullets.push({ x: d.x, y: d.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 3.5, life: 3, spin: 0 });
+        sfx.mine();
+      }
+      d.mineTimer -= dt;
+      if (d.mineTimer <= 0 && mines.length < 8 + wave) {
+        d.mineTimer = rand(4, 8);
+        mines.push({ x: d.x, y: d.y, r: 7, pulse: rand(0, Math.PI * 2) });
+      }
+    }
+    if (ship.alive && ship.invuln <= 0 && dist2(d.x, d.y, ship.x, ship.y) < (d.r + ship.r) ** 2) {
+      killShip();
+    }
+  }
+
+  // --- Bullets vs droids / mines
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    let consumed = false;
+    for (let j = droids.length - 1; j >= 0; j--) {
+      const d = droids[j];
+      if (dist2(b.x, b.y, d.x, d.y) < (d.r + b.r + 2) ** 2) {
+        bullets.splice(i, 1);
+        destroyDroid(j, true);
+        consumed = true;
+        break;
+      }
+    }
+    if (consumed) continue;
+    for (let j = mines.length - 1; j >= 0; j--) {
+      const m = mines[j];
+      if (dist2(b.x, b.y, m.x, m.y) < (m.r + b.r + 2) ** 2) {
+        bullets.splice(i, 1);
+        spawnShards(MINE_MODEL, m.x, m.y, 1, 150);
+        boomSmall(m.x, m.y, [255, 215, 94]);
+        addScore(350, m.x, m.y, "#ffd75e");
+        sfx.mine();
+        mines.splice(j, 1);
+        break;
+      }
+    }
+  }
+
+  // --- Mines
+  for (const m of mines) {
+    m.pulse += dt * 5;
+    if (ship.alive && ship.invuln <= 0 && dist2(m.x, m.y, ship.x, ship.y) < (m.r + ship.r) ** 2) {
+      spawnShards(MINE_MODEL, m.x, m.y, 1, 150);
+      boomSmall(m.x, m.y, [255, 215, 94]);
+      killShip();
+    }
+  }
+
+  // --- Wave cleared
+  if (state === "playing" && droids.length === 0 && waveTimer <= 0) {
+    addScore(wave * 500);
+    startWave(wave + 1);
+    if (ship.alive) ship.invuln = Math.max(ship.invuln, 1.2);
+  }
+
+  // --- Effects
+  for (let i = shards.length - 1; i >= 0; i--) {
+    const s = shards[i];
+    s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
+    s.vz -= 620 * dt;
+    if (s.z < 0) { s.z = 0; s.vz = -s.vz * 0.45; s.vx *= 0.7; s.vy *= 0.7; }
+    s.yaw += s.sYaw * dt; s.pitch += s.sPitch * dt; s.roll += s.sRoll * dt;
+    s.life -= dt;
+    if (s.life <= 0) shards.splice(i, 1);
+  }
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i];
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+    p.vz -= 500 * dt;
+    if (p.z < 0) { p.z = 0; p.vz = -p.vz * 0.4; }
+    p.vx *= Math.pow(0.3, dt); p.vy *= Math.pow(0.3, dt);
+    p.life -= dt;
+    if (p.life <= 0) sparks.splice(i, 1);
+  }
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const r = rings[i];
+    r.r += r.speed * dt;
+    r.speed *= Math.pow(0.25, dt);
+    r.life -= dt;
+    if (r.life <= 0) rings.splice(i, 1);
+  }
+  for (let i = pillars.length - 1; i >= 0; i--) {
+    pillars[i].life -= dt;
+    if (pillars[i].life <= 0) pillars.splice(i, 1);
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.y -= 26 * dt; f.life -= dt;
+    if (f.life <= 0) floaters.splice(i, 1);
+  }
+}
+
+// ================================================================ Render
+function wallBand(x1, y1, x2, y2, h, sideFill, topStroke) {
+  const dy = -h * ZS;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x2, y2 + dy);
+  ctx.lineTo(x1, y1 + dy);
+  ctx.closePath();
+  ctx.fillStyle = sideFill;
+  ctx.fill();
+  ctx.strokeStyle = topStroke;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = topStroke;
+  ctx.shadowBlur = 9;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1 + dy);
+  ctx.lineTo(x2, y2 + dy);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function render() {
+  ctx.save();
+  ctx.fillStyle = "#05080d";
+  ctx.fillRect(0, 0, W, H);
+  if (shake > 0) ctx.translate(rand(-shake, shake) * 0.45, rand(-shake, shake) * 0.45);
+
+  // Floor grid
+  ctx.strokeStyle = "rgba(30, 70, 95, 0.22)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = field.l; x <= field.r; x += 60) { ctx.moveTo(x, field.t); ctx.lineTo(x, field.b); }
+  for (let y = field.t; y <= field.b; y += 60) { ctx.moveTo(field.l, y); ctx.lineTo(field.r, y); }
+  ctx.stroke();
+
+  // Floor vignette
+  const vg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.2, W/2, H/2, Math.max(W,H)*0.75);
+  vg.addColorStop(0, "rgba(10, 30, 45, 0.10)");
+  vg.addColorStop(1, "rgba(0, 0, 0, 0.42)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Outer walls (extruded bands)
+  const WH = 13;
+  wallBand(field.l, field.b, field.l, field.t, WH, "#0a2e3c", "#35e0ff"); // left
+  wallBand(field.r, field.b, field.r, field.t, WH, "#0a2e3c", "#35e0ff"); // right
+  wallBand(field.l, field.t, field.r, field.t, WH, "#0d3b4d", "#35e0ff"); // top
+  wallBand(field.l, field.b, field.r, field.b, WH, "#0d3b4d", "#35e0ff"); // bottom
+
+  // Center slab
+  const b = field.box, BH2 = 10, dy = -BH2 * ZS;
+  ctx.fillStyle = "#0d3b4d";
+  ctx.fillRect(b.l, b.t + dy, b.r - b.l, (b.b - b.t));
+  ctx.fillStyle = "#07222e";
+  ctx.fillRect(b.l, b.t + dy, b.r - b.l, (b.b - b.t) + 0);
+  // slab front face
+  ctx.fillStyle = "#0d3b4d";
+  ctx.fillRect(b.l, b.b + dy, b.r - b.l, BH2 * ZS);
+  ctx.strokeStyle = "#35e0ff";
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = "#35e0ff";
+  ctx.shadowBlur = 8;
+  ctx.strokeRect(b.l, b.t + dy, b.r - b.l, b.b - b.t);
+  ctx.shadowBlur = 0;
+
+  // Scoreboard on the slab
+  const cx = W / 2;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#6b7d8c";
+  ctx.font = "11px Consolas, monospace";
+  const rowY = b.t + dy + (b.b - b.t) * 0.30;
+  ctx.fillText("SCORE", cx - (b.r - b.l) * 0.28, rowY);
+  ctx.fillText("HIGH",  cx,                      rowY);
+  ctx.fillText("WAVE",  cx + (b.r - b.l) * 0.28, rowY);
+  ctx.fillStyle = "#dbe7f0";
+  ctx.font = "600 20px Consolas, monospace";
+  ctx.fillText(score.toLocaleString(), cx - (b.r - b.l) * 0.28, rowY + 26);
+  ctx.fillText(Math.max(highScore, score).toLocaleString(), cx, rowY + 26);
+  ctx.fillText(String(wave), cx + (b.r - b.l) * 0.28, rowY + 26);
+  const livesY = b.b + dy - (b.b - b.t) * 0.24;
+  for (let i = 0; i < Math.min(lives, 8); i++) {
+    drawModel(SHIP_MODEL, cx - ((Math.min(lives,8) - 1) * 30) / 2 + i * 30, livesY, -Math.PI / 2, 0, 0, 0.65, 1);
+  }
+  if (waveTimer > 0 && state === "playing") {
+    ctx.fillStyle = "#ffb347";
+    ctx.font = "600 15px Consolas, monospace";
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(performance.now() / 90);
+    ctx.fillText("WAVE " + wave, cx, b.t + dy - 16);
+    ctx.globalAlpha = 1;
+  }
+
+  // Ship trail
+  if (ship.alive && trail.length > 2) {
+    for (let i = 1; i < trail.length; i++) {
+      const a = (1 - i / trail.length) * 0.35;
+      ctx.strokeStyle = `rgba(53, 224, 255, ${a})`;
+      ctx.lineWidth = Math.max(1, 5 * (1 - i / trail.length));
+      ctx.beginPath();
+      ctx.moveTo(trail[i-1].x, trail[i-1].y);
+      ctx.lineTo(trail[i].x, trail[i].y);
+      ctx.stroke();
+    }
+  }
+
+  // Mines
+  const now = performance.now() / 1000;
+  for (const m of mines) {
+    const sc = 1 + Math.sin(m.pulse) * 0.2;
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y + 4, 8 * sc, 3.5 * sc, 0, 0, Math.PI * 2);
+    ctx.fill();
+    drawModel(MINE_MODEL, m.x, m.y, m.pulse * 0.4, now * 1.7, 0, sc, 1);
+  }
+
+  // Droids
+  for (const d of droids) {
+    ctx.fillStyle = "rgba(0,0,0,0.32)";
+    ctx.beginPath();
+    ctx.ellipse(d.x, d.y + 5, d.r * 1.05, d.r * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    drawModel(d.cmd ? CMD_MODEL : DROID_MODEL, d.x, d.y - 6, d.wobble * 0.5, now * d.spin, now * d.spin * 1.4, 1, 1);
+  }
+
+  // Enemy bullets
+  for (const eb of enemyBullets) drawModel(EBULLET_MODEL, eb.x, eb.y, eb.spin, eb.spin * 1.3, 0, 1, 1);
+
+  // Player bullets
+  for (const pb of bullets) drawModel(PBULLET_MODEL, pb.x, pb.y, pb.spin, pb.spin * 1.3, 0, 1, 1);
+
+  // Ship
+  if (ship.alive) {
+    const blink = ship.invuln > 0 && Math.floor(performance.now() / 90) % 2 === 0;
+    if (!blink) {
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(ship.x, ship.y + 5, 13, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (ship.thrusting) {
+        const fl = 12 + Math.random() * 12;
+        const a = ship.angle;
+        const bx = ship.x - Math.cos(a) * 12, by = ship.y - Math.sin(a) * 12 - 4;
+        const px = -Math.sin(a), py = Math.cos(a);
+        const g = ctx.createLinearGradient(bx, by, bx - Math.cos(a) * fl, by - Math.sin(a) * fl);
+        g.addColorStop(0, "rgba(255, 220, 150, 0.95)");
+        g.addColorStop(1, "rgba(255, 120, 40, 0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(bx + px * 5, by + py * 5);
+        ctx.lineTo(bx - Math.cos(a) * fl, by - Math.sin(a) * fl);
+        ctx.lineTo(bx - px * 5, by - py * 5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      drawModel(SHIP_MODEL, ship.x, ship.y - 4, ship.angle, 0, ship.roll, 1, 1);
+    }
+  }
+
+  // Shards
+  for (const s of shards) {
+    const alpha = Math.min(1, s.life / 0.5);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y + 3, 6, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    drawModel([{ v: s.v, c: s.c }], s.x, s.y - s.z * ZS, s.yaw, s.pitch, s.roll, s.scale, alpha);
+  }
+
+  // Additive effects
+  ctx.globalCompositeOperation = "lighter";
+  for (const p of sparks) {
+    const a = Math.max(0, p.life / p.maxLife);
+    ctx.strokeStyle = `rgba(${p.rgb[0]},${p.rgb[1]},${p.rgb[2]},${a})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03 - p.z * ZS);
+    ctx.lineTo(p.x, p.y - p.z * ZS);
+    ctx.stroke();
+  }
+  for (const r of rings) {
+    const a = Math.max(0, r.life / r.maxLife);
+    ctx.strokeStyle = `rgba(${r.rgb[0]},${r.rgb[1]},${r.rgb[2]},${a * 0.9})`;
+    ctx.lineWidth = r.width * a + 1;
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(r.x, r.y, r.r * 1.15, r.r * 0.5, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${r.rgb[0]},${r.rgb[1]},${r.rgb[2]},${a * 0.4})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  for (const pl of pillars) {
+    const a = Math.max(0, pl.life / pl.maxLife);
+    const g = ctx.createLinearGradient(pl.x, pl.y, pl.x, pl.y - pl.h * a);
+    g.addColorStop(0, `rgba(${pl.rgb[0]},${pl.rgb[1]},${pl.rgb[2]},${a * 0.8})`);
+    g.addColorStop(1, `rgba(${pl.rgb[0]},${pl.rgb[1]},${pl.rgb[2]},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(pl.x - pl.w * a / 2, pl.y - pl.h * a, pl.w * a, pl.h * a);
+  }
+  ctx.globalCompositeOperation = "source-over";
+
+  // Floaters
+  ctx.font = "600 13px Consolas, monospace";
+  ctx.textAlign = "center";
+  for (const f of floaters) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
+    ctx.fillStyle = f.color;
+    ctx.shadowColor = f.color;
+    ctx.shadowBlur = 8;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+
+  // Screen flash
+  if (flashAlpha > 0) {
+    ctx.fillStyle = `rgba(220, 240, 250, ${flashAlpha})`;
+    ctx.fillRect(-40, -40, W + 80, H + 80);
+  }
+
+  if (muted) {
+    ctx.fillStyle = "#6b7d8c";
+    ctx.font = "11px Consolas, monospace";
+    ctx.textAlign = "right";
+    ctx.fillText("MUTED [M]", field.r - 8, field.b - 8);
+  }
+  ctx.restore();
+}
+
+// ================================================================ Loop
+let last = performance.now();
+function frame(now) {
+  let dtRaw = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  if (state === "playing" || state === "gameover") {
+    if (hitStop > 0) {
+      hitStop -= dtRaw;
+    } else {
+      timeScale = Math.min(1, timeScale + dtRaw * 1.1);
+      update(dtRaw * timeScale);
+    }
+  }
+  render();
+  requestAnimationFrame(frame);
+}
+
+// Debug hooks (harmless in production, invaluable when the tab is hidden)
+window.__dbg = () => JSON.stringify({
+  state, lives, score, wave,
+  ship: { x: +ship.x.toFixed(1), y: +ship.y.toFixed(1), angle: +ship.angle.toFixed(2), alive: ship.alive, invuln: +ship.invuln.toFixed(2) },
+  bullets: bullets.length, droids: droids.length, mines: mines.length,
+  shards: shards.length, sparks: sparks.length, timeScale: +timeScale.toFixed(2),
+});
+window.__tick = (dt = 1/60, n = 1) => { for (let i = 0; i < n; i++) update(dt); render(); return window.__dbg(); };
+
+resizeCanvas();
+render();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
